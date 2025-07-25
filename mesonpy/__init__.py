@@ -320,6 +320,7 @@ class _WheelBuilder():
         self._limited_api = limited_api
         self._allow_windows_shared_libs = allow_windows_shared_libs
         self._host_system = host_system
+        print('111 self._host_system: ', self._host_system)
 
     @property
     def _has_internal_libs(self) -> bool:
@@ -353,8 +354,10 @@ class _WheelBuilder():
             return mesonpy._tags.Tag('py3', 'none', None)
         # read platform from cross
         _platform = None
+        print('1111 self._host_system: ', self._host_system, ', == : ', self._host_system == 'android')
         if self._host_system == 'android':
             _platform = 'linux-aarch64'
+        print('111 _platform: ', _platform, file=sys.stderr)
         return mesonpy._tags.Tag(None, self._stable_abi, _platform)
 
     @property
@@ -835,13 +838,21 @@ class Project():
         # Shared library support on Windows requires collaboration
         # from the package, make sure the developers acknowledge this.
         self._allow_windows_shared_libs = pyproject_config.get('allow-windows-internal-shared-libs', False)
+        print('111 _system: ', self.system(), file=sys.stderr)
         self._system = self.system()
 
     def system(self) -> Optional[str]:
-        if self._meson_cross_file is not None and self._meson_cross_file.exists():
+        cross_file_value = next(
+            (arg.split('=', 1)[1] for arg in self._meson_args['setup'] if arg.startswith('--cross-file=')),
+            None  # 如果没有匹配项则返回 None
+        )
+        cross_file = pathlib.Path(cross_file_value)
+        if cross_file.is_file():
             config = configparser.ConfigParser()
-            config.read(self._meson_cross_file)
-            return config['host_machine']['system']
+            config.read(cross_file)
+            return (config['host_machine']['system']).strip('\'')
+        else:
+            print('111 cross_file is none', file=sys.stderr)
         return None
 
     def _run(self, cmd: Sequence[str]) -> None:

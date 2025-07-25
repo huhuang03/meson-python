@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import configparser
 import contextlib
 import copy
 import difflib
@@ -312,11 +313,13 @@ class _WheelBuilder():
         manifest: Dict[str, List[Tuple[pathlib.Path, str]]],
         limited_api: bool,
         allow_windows_shared_libs: bool,
+        host_system: str = None,
     ) -> None:
         self._metadata = metadata
         self._manifest = manifest
         self._limited_api = limited_api
         self._allow_windows_shared_libs = allow_windows_shared_libs
+        self._host_system = host_system
 
     @property
     def _has_internal_libs(self) -> bool:
@@ -348,7 +351,11 @@ class _WheelBuilder():
             # distribute any file in {platlib}) thus use generic
             # implementation and ABI tags.
             return mesonpy._tags.Tag('py3', 'none', None)
-        return mesonpy._tags.Tag(None, self._stable_abi, None)
+        # read platform from cross
+        _platform = None
+        if self._host_system == 'android':
+            _platform = 'linux-aarch64'
+        return mesonpy._tags.Tag(None, self._stable_abi, _platform)
 
     @property
     def name(self) -> str:
@@ -828,6 +835,14 @@ class Project():
         # Shared library support on Windows requires collaboration
         # from the package, make sure the developers acknowledge this.
         self._allow_windows_shared_libs = pyproject_config.get('allow-windows-internal-shared-libs', False)
+        self._system = self.system()
+
+    def system(self) -> Optional[str]:
+        if self._meson_cross_file is not None and self._meson_cross_file.exists():
+            config = configparser.ConfigParser()
+            config.read(self._meson_cross_file)
+            return config['host_machine']['system']
+        return None
 
     def _run(self, cmd: Sequence[str]) -> None:
         """Invoke a subprocess."""
@@ -1067,7 +1082,8 @@ class Project():
     def wheel(self, directory: Path) -> pathlib.Path:
         """Generates a wheel in the specified directory."""
         self.build()
-        builder = _WheelBuilder(self._metadata, self._manifest, self._limited_api, self._allow_windows_shared_libs)
+        builder = _WheelBuilder(self._metadata, self._manifest, self._limited_api, self._allow_windows_shared_libs,
+                                self._system)
         return builder.build(directory)
 
     def editable(self, directory: Path) -> pathlib.Path:

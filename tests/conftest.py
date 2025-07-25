@@ -27,6 +27,12 @@ from mesonpy._util import chdir
 
 
 _meson_ver_str = subprocess.run(['meson', '--version'], check=True, stdout=subprocess.PIPE, text=True).stdout
+# 去除 ANSI 控制字符（如 \x1b[0m）
+_meson_ver_str = re.sub(r'\x1b\[[0-9;]*m', '', _meson_ver_str)
+# 去除换行和首尾空白
+_meson_ver_str = _meson_ver_str.strip()
+print(_meson_ver_str.split('.'))
+print('_meson_ver_str: {}, {}'.format(_meson_ver_str, _meson_ver_str.split('.')[:3]))
 MESON_VERSION = tuple(map(int, _meson_ver_str.split('.')[:3]))
 
 
